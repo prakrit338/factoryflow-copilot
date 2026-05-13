@@ -1,0 +1,105 @@
+{
+    "swagger": "2.0",
+    "info": {
+      "title": "FactoryFlow Incident Triage API",
+      "description": "REST API for classifying industrial incidents and returning structured triage results for FactoryFlow Copilot.",
+      "version": "1.0.0"
+    },
+    "host": "bmfvs93k-8000.euw.devtunnels.ms",
+    "basePath": "/",
+    "schemes": ["https"],
+    "consumes": ["application/json"],
+    "produces": ["application/json"],
+    "paths": {
+      "/incident/triage": {
+        "post": {
+          "summary": "Classify an industrial incident",
+          "description": "Analyze an industrial incident description and return a structured triage result including issue category, confidence, matched keywords, escalation, and summary.",
+          "operationId": "IncidentTriage",
+          "parameters": [
+            {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/IncidentTriageRequest"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful triage result",
+              "schema": {
+                "$ref": "#/definitions/IncidentTriageResponse"
+              }
+            }
+          }
+        }
+      }
+    },
+    "definitions": {
+      "IncidentTriageRequest": {
+        "type": "object",
+        "required": ["incident_text", "machine_type", "severity_hint"],
+        "properties": {
+          "incident_text": {
+            "type": "string",
+            "description": "Natural language description of the incident."
+          },
+          "machine_type": {
+            "type": "string",
+            "description": "Type of machine or controller involved."
+          },
+          "severity_hint": {
+            "type": "string",
+            "description": "User-provided severity hint such as low, medium, high, or critical."
+          }
+        }
+      },
+      "IncidentTriageResponse": {
+        "type": "object",
+        "required": [
+          "issue_category",
+          "possible_failure_modes",
+          "confidence",
+          "recommended_next_step",
+          "needs_manual_lookup",
+          "matched_keywords",
+          "escalation_required",
+          "triage_summary"
+        ],
+        "properties": {
+          "issue_category": {
+            "type": "string"
+          },
+          "possible_failure_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "recommended_next_step": {
+            "type": "string"
+          },
+          "needs_manual_lookup": {
+            "type": "boolean"
+          },
+          "matched_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "escalation_required": {
+            "type": "boolean"
+          },
+          "triage_summary": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }

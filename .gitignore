@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# macOS
+.DS_Store
+
+# Environment / local config
+.env
+.env.local
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# Tunnel / temp files
+*.tmp
+*.temp
+
+# Large or private local raw docs (keep repo clean/public-safe)
+data/raw/siemens_manuals/*.pdf
+data/raw/mimii/*
+data/raw/ai4i/*
+``
