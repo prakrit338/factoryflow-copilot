@@ -1,3 +1,9 @@
+
+import os
+import base64
+import requests
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi import FastAPI
 from app.models import (
     IncidentTriageRequest,
@@ -171,25 +177,78 @@ def triage_incident(request: IncidentTriageRequest):
 @app.post("/jira/create-issue", response_model = JiraCreateIssueResponse)
 
 @app.post("/jira/create-issue", response_model=JiraCreateIssueResponse)
+@app.post("/jira/create-issue", response_model=JiraCreateIssueResponse)
 def create_jira_issue(request: JiraCreateIssueRequest):
-    issue_key = "FACT-101"
-    issue_url = f"https://example.atlassian.net/browse/{issue_key}"
+    jira_base_url = os.getenv("JIRA_BASE_URL")
+    jira_email = os.getenv("JIRA_EMAIL")
+    jira_api_token = os.getenv("JIRA_API_TOKEN")
+    jira_project_key = os.getenv("JIRA_PROJECT_KEY")
+
+    if not all([jira_base_url, jira_email, jira_api_token, jira_project_key]):
+        return JiraCreateIssueResponse(
+            success=False,
+            jira_issue_key="",
+            jira_issue_url="",
+            message="Jira configuration is missing. Please set the Jira environment variables."
+        )
 
     jira_summary = build_jira_summary(request.issue_category, request.machine_type)
     jira_priority = get_jira_priority_from_severity(request.severity_hint)
+    jira_description = build_jira_description_adf(request, jira_priority)
 
-    message = (
-        f"Jira issue created successfully. "
-        f"Summary: {jira_summary}. "
-        f"Priority: {jira_priority}."
-    )
+    auth_string = f"{jira_email}:{jira_api_token}"
+    auth_encoded = base64.b64encode(auth_string.encode("utf-8")).decode("utf-8")
 
-    return JiraCreateIssueResponse(
-        success=True,
-        jira_issue_key=issue_key,
-        jira_issue_url=issue_url,
-        message=message
-    )
+    headers = {
+        "Authorization": f"Basic {auth_encoded}",
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "fields": {
+            "project": {
+                "key": jira_project_key
+            },
+            "summary": jira_summary,
+            "issuetype": {
+                "name": "Task"
+            },
+            "description": jira_description
+        }
+    }
+
+    jira_url = f"{jira_base_url}/rest/api/3/issue"
+
+    try:
+        response = requests.post(jira_url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code in [200, 201]:
+            issue_key = response_data.get("key", "")
+            issue_url = f"{jira_base_url}/browse/{issue_key}"
+
+            return JiraCreateIssueResponse(
+                success=True,
+                jira_issue_key=issue_key,
+                jira_issue_url=issue_url,
+                message=f"Jira issue created successfully. Summary: {jira_summary}. Priority: {jira_priority}."
+            )
+        else:
+            return JiraCreateIssueResponse(
+                success=False,
+                jira_issue_key="",
+                jira_issue_url="",
+                message=f"Jira issue creation failed. Status: {response.status_code}. Response: {response.text}"
+            )
+
+    except Exception as e:
+        return JiraCreateIssueResponse(
+            success=False,
+            jira_issue_key="",
+            jira_issue_url="",
+            message=f"Error while creating Jira issue: {str(e)}"
+        )
 
 def get_jira_priority_from_severity(severity_hint):
     severity = severity_hint.lower()
@@ -200,3 +259,32 @@ def get_jira_priority_from_severity(severity_hint):
         return "Medium"
 def build_jira_summary(issue_category, machine_type):
     return f"{issue_category.capitalize()} detected in {machine_type}"
+def build_jira_description_adf(request: JiraCreateIssueRequest, jira_priority: str):
+    description_text = (
+        f"Incident text: {request.incident_text}\n\n"
+        f"Machine type: {request.machine_type}\n"
+        f"Severity hint: {request.severity_hint}\n"
+        f"Issue category: {request.issue_category}\n"
+        f"Confidence: {request.confidence}\n"
+        f"Matched keywords: {', '.join(request.matched_keywords)}\n"
+        f"Escalation required: {request.escalation_required}\n"
+        f"Recommended next step: {request.recommended_next_step}\n"
+        f"Triage summary: {request.triage_summary}\n"
+        f"FactoryFlow priority interpretation: {jira_priority}"
+    )
+
+    return {
+        "type": "doc",
+        "version": 1,
+        "content": [
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": description_text
+                    }
+                ]
+            }
+        ]
+    }
